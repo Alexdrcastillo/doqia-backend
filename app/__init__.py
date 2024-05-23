@@ -2,14 +2,14 @@ from flask import Flask
 from flask_sqlalchemy import SQLAlchemy
 
 app = Flask(__name__)
-app.config['SQLALCHEMY_DATABASE_URI'] = 'mysql+mysqlconnector://root:12345678@localhost/doqia'
+
+# Configuración de la base de datos
+app.config['SQLALCHEMY_DATABASE_URI'] = 'postgresql://database_doqia_user:9iCarEpLArP1VsUXdAep3iDFK9MUx9J3@dpg-cp78vomd3nmc73bnp5u0-a.oregon-postgres.render.com/database_doqia'
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 db = SQLAlchemy(app)
 
-# Importa las rutas después de crear la aplicación para evitar el error de importación circular
-from app import routes, models
+from app import routes  # Asegúrate de importar tus rutas aquí
 
-# Crear todas las tablas en la base de datos
-with app.app_context():
-    db.create_all()
+if __name__ == "__main__":
+    app.run(debug=True)
