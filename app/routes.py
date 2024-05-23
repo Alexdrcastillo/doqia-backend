@@ -41,8 +41,32 @@ def get_services():
     result = [
         {
             'id': service.id,
-            'username': service.user.username,
-            'description': service.description
+            'description': service.description,
+            'comments': service.comments
         } for service in services
     ]
     return jsonify(result)
+
+
+@app.route('/services/<int:service_id>/comment', methods=['POST'])
+def add_comment(service_id):
+    data = request.json
+    comment = data.get('comment')
+    service = Service.query.get(service_id)
+    if not service:
+        return jsonify({'message': 'Service not found'}), 404
+    if service.comments is None:
+        service.comments = []
+    service.comments.append(comment)
+    db.session.commit()
+    return jsonify({'message': 'Comment added successfully'})
+
+
+@app.route('/users/<int:user_id>', methods=['DELETE'])
+def delete_user(user_id):
+    user = User.query.get(user_id)
+    if not user:
+        return jsonify({'message': 'User not found'}), 404
+    db.session.delete(user)
+    db.session.commit()
+    return jsonify({'message': 'User deleted successfully'})

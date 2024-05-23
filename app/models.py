@@ -1,4 +1,4 @@
-from sqlalchemy import Column, Integer, String, Boolean
+from sqlalchemy import Column, Integer, String, Boolean, ARRAY
 from . import db
 
 class User(db.Model):
@@ -14,4 +14,5 @@ class Service(db.Model):
     id = Column(Integer, primary_key=True)
     user_id = Column(Integer, db.ForeignKey('user.id'), nullable=False)
     description = Column(String(255), nullable=False)
+    comments = Column(ARRAY(String), default=list)
     user = db.relationship('User', backref=db.backref('services', lazy=True))
