@@ -1,4 +1,6 @@
-from sqlalchemy import Column, Integer, String, Boolean, ARRAY
+# models.py
+from sqlalchemy import Column, Integer, String, Boolean, ForeignKey
+from sqlalchemy.orm import relationship
 from . import db
 
 class User(db.Model):
@@ -12,7 +14,13 @@ class User(db.Model):
 class Service(db.Model):
     __tablename__ = 'service'
     id = Column(Integer, primary_key=True)
-    user_id = Column(Integer, db.ForeignKey('user.id'), nullable=False)
+    user_id = Column(Integer, ForeignKey('user.id'), nullable=False)
     description = Column(String(255), nullable=False)
-    comments = Column(ARRAY(String), default=list)
-    user = db.relationship('User', backref=db.backref('services', lazy=True))
+    user = relationship('User', backref=db.backref('services', lazy=True))
+
+class Comment(db.Model):
+    __tablename__ = 'comment'
+    id = Column(Integer, primary_key=True)
+    service_id = Column(Integer, ForeignKey('service.id'), nullable=False)
+    text = Column(String, nullable=False)
+    service = relationship('Service', backref=db.backref('comments', lazy=True))

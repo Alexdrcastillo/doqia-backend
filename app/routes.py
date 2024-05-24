@@ -4,27 +4,39 @@ from app.models import User, Service, db
 
 @app.route('/users', methods=['POST'])
 def create_user():
-    data = request.json
+    data = request.get_json()
     new_user = User(
         username=data['username'],
         email=data['email'],
         password=data['password'],
-        is_client=data.get('is_client', True)  # Valor por defecto True
+        is_client=data.get('is_client', True)
     )
     db.session.add(new_user)
     db.session.commit()
-    return jsonify({'message': 'User created successfully'})
+    return jsonify({'message': 'User created successfully'}), 201
 
 
 @app.route('/users', methods=['GET'])
 def get_users():
     users = User.query.all()
-    result = [{'id': user.id, 'username': user.username, 'email': user.email, 'password': user.password, 'is_client': user.is_client} for user in users]
-    return jsonify(result)
+    result = [
+        {
+            'id': user.id,
+            'username': user.username,
+            'email': user.email,
+            'password': user.password,
+            'is_client': user.is_client
+        }
+        for user in users
+    ]
+    return jsonify(result), 200
+from app import app
+from flask import jsonify, request
+from app.models import User, Service, Comment, db
 
 @app.route('/services', methods=['POST'])
 def create_service():
-    data = request.json
+    data = request.get_json()
     user_id = data['user_id']
     description = data['description']
     user = User.query.get(user_id)
@@ -33,7 +45,7 @@ def create_service():
     new_service = Service(user_id=user_id, description=description)
     db.session.add(new_service)
     db.session.commit()
-    return jsonify({'message': 'Service created successfully'})
+    return jsonify({'message': 'Service created successfully'}), 201
 
 @app.route('/services', methods=['GET'])
 def get_services():
@@ -42,25 +54,27 @@ def get_services():
         {
             'id': service.id,
             'description': service.description,
-            'comments': service.comments
-        } for service in services
+            'comments': [{'id': comment.id, 'text': comment.text} for comment in service.comments]
+        }
+        for service in services
     ]
-    return jsonify(result)
-
+    return jsonify(result), 200
 
 @app.route('/services/<int:service_id>/comment', methods=['POST'])
 def add_comment(service_id):
-    data = request.json
-    comment = data.get('comment')
+    data = request.get_json()
+    comment_text = data.get('comment')
     service = Service.query.get(service_id)
     if not service:
         return jsonify({'message': 'Service not found'}), 404
-    if service.comments is None:
-        service.comments = []
-    service.comments.append(comment)
+    new_comment = Comment(service_id=service.id, text=comment_text)
+    db.session.add(new_comment)
     db.session.commit()
-    return jsonify({'message': 'Comment added successfully'})
-
+    return jsonify({
+        'message': 'Comment added successfully',
+        'service_id': service.id,
+        'comments': [{'id': comment.id, 'text': comment.text} for comment in service.comments]
+    }), 200
 
 @app.route('/users/<int:user_id>', methods=['DELETE'])
 def delete_user(user_id):
@@ -69,4 +83,4 @@ def delete_user(user_id):
         return jsonify({'message': 'User not found'}), 404
     db.session.delete(user)
     db.session.commit()
-    return jsonify({'message': 'User deleted successfully'})
+    return jsonify({'message': 'User deleted successfully'}), 200
