@@ -13,8 +13,15 @@ def create_user():
     )
     db.session.add(new_user)
     db.session.commit()
-    return jsonify({'message': 'User created successfully'}), 201
-
+    return jsonify({
+        'message': 'User created successfully',
+        'user': {
+            'id': new_user.id,
+            'username': new_user.username,
+            'email': new_user.email,
+            'is_client': new_user.is_client
+        }
+    }), 201
 
 @app.route('/users', methods=['GET'])
 def get_users():
