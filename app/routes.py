@@ -21,8 +21,8 @@ def create_user():
             'email': new_user.email,
             'is_client': new_user.is_client
         }
-    }), 201
-
+    })
+    
 @app.route('/users', methods=['GET'])
 def get_users():
     users = User.query.all()
@@ -83,7 +83,7 @@ def add_comment(service_id):
         'comments': [{'id': comment.id, 'text': comment.text} for comment in service.comments]
     }), 200
 
-@app.route('/users/<int:user_id>', methods=['DELETE'])
+@app.route('/users/<int:user_id>', methods=['DEL    ETE'])
 def delete_user(user_id):
     user = User.query.get(user_id)
     if not user:
