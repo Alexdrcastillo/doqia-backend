@@ -37,9 +37,7 @@ def get_users():
         for user in users
     ]
     return jsonify(result), 200
-from app import app
-from flask import jsonify, request
-from app.models import User, Service, Comment, db
+
 
 @app.route('/services', methods=['POST'])
 def create_service():
