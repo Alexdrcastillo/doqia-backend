@@ -46,10 +46,12 @@ def create_service():
     data = request.get_json()
     user_id = data['user_id']
     description = data['description']
+    address = data['address']  # Nueva línea
+    occupation = data['occupation']  # Nueva línea
     user = User.query.get(user_id)
     if not user:
         return jsonify({'message': 'User not found'}), 404
-    new_service = Service(user_id=user_id, description=description)
+    new_service = Service(user_id=user_id, description=description, address=address, occupation=occupation)  # Nueva línea
     db.session.add(new_service)
     db.session.commit()
     return jsonify({'message': 'Service created successfully'}), 201
@@ -61,6 +63,8 @@ def get_services():
         {
             'id': service.id,
             'description': service.description,
+            'address': service.address,
+            'occupation': service.occupation,  # Nueva línea
             'comments': [{'id': comment.id, 'text': comment.text} for comment in service.comments]
         }
         for service in services
@@ -82,12 +86,3 @@ def add_comment(service_id):
         'service_id': service.id,
         'comments': [{'id': comment.id, 'text': comment.text} for comment in service.comments]
     }), 200
-
-@app.route('/users/<int:user_id>', methods=['DEL    ETE'])
-def delete_user(user_id):
-    user = User.query.get(user_id)
-    if not user:
-        return jsonify({'message': 'User not found'}), 404
-    db.session.delete(user)
-    db.session.commit()
-    return jsonify({'message': 'User deleted successfully'}), 200
