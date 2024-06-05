@@ -69,11 +69,12 @@ def get_services():
         for service in services
     ]
     return jsonify(result), 200
-
+    
 @app.route('/services/<address>/<occupation>', methods=['GET'])
 def search_services(address, occupation):
     address = unquote(address)
     occupation = unquote(occupation)
+    print(f"Search parameters: address={address}, occupation={occupation}")  # Agrega esto para depurar
     services = Service.query.filter(Service.address.ilike(f'%{address}%'), Service.occupation.ilike(f'%{occupation}%')).all()
     result = [
         {
@@ -82,7 +83,7 @@ def search_services(address, occupation):
             'address': service.address,
             'occupation': service.occupation,
             'comments': [{'id': comment.id, 'text': comment.text} for comment in service.comments],
-            'username': service.user.username  # Agregar el nombre de usuario
+            'username': service.user.username
         }
         for service in services
     ]
