@@ -70,7 +70,7 @@ def get_services():
     ]
     return jsonify(result), 200
     
-@app.route('/services/<address>/<occupation>', methods=['GET'])
+    @app.route('/services/<address>/<occupation>', methods=['GET'])
 def search_services(address, occupation):
     address = unquote(address)
     occupation = unquote(occupation)
