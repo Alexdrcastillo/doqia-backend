@@ -1,6 +1,7 @@
 from app import app
 from flask import jsonify, request
-from app.models import User, Service, db
+from app.models import User, Service, Comment, db
+from urllib.parse import unquote
 
 @app.route('/users', methods=['POST'])
 def create_user():
@@ -22,7 +23,7 @@ def create_user():
             'is_client': new_user.is_client
         }
     })
-    
+
 @app.route('/users', methods=['GET'])
 def get_users():
     users = User.query.all()
@@ -38,18 +39,17 @@ def get_users():
     ]
     return jsonify(result), 200
 
-
 @app.route('/services', methods=['POST'])
 def create_service():
     data = request.get_json()
     user_id = data['user_id']
     description = data['description']
-    address = data['address']  # Nueva línea
-    occupation = data['occupation']  # Nueva línea
+    address = data['address']
+    occupation = data['occupation']
     user = User.query.get(user_id)
     if not user:
         return jsonify({'message': 'User not found'}), 404
-    new_service = Service(user_id=user_id, description=description, address=address, occupation=occupation)  # Nueva línea
+    new_service = Service(user_id=user_id, description=description, address=address, occupation=occupation)
     db.session.add(new_service)
     db.session.commit()
     return jsonify({'message': 'Service created successfully'}), 201
@@ -62,8 +62,27 @@ def get_services():
             'id': service.id,
             'description': service.description,
             'address': service.address,
-            'occupation': service.occupation,  # Nueva línea
-            'comments': [{'id': comment.id, 'text': comment.text} for comment in service.comments]
+            'occupation': service.occupation,
+            'comments': [{'id': comment.id, 'text': comment.text} for comment in service.comments],
+            'username': service.user.username  # Agregar el nombre de usuario
+        }
+        for service in services
+    ]
+    return jsonify(result), 200
+    
+@app.route('/services/<address>/<occupation>', methods=['GET'])
+def search_services(address, occupation):
+    address = unquote(address)
+    occupation = unquote(occupation)
+    services = Service.query.filter(Service.address.ilike(f'%{address}%'), Service.occupation.ilike(f'%{occupation}%')).all()
+    result = [
+        {
+            'id': service.id,
+            'description': service.description,
+            'address': service.address,
+            'occupation': service.occupation,
+            'comments': [{'id': comment.id, 'text': comment.text} for comment in service.comments],
+            'username': service.user.username  # Agregar el nombre de usuario
         }
         for service in services
     ]

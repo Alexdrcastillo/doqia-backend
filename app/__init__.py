@@ -7,7 +7,7 @@ import os
 app = Flask(__name__)
 
 # Configuración de CORS
-CORS(app, resources={r"/*": {"origins": "https://doqia-client.onrender.com"}})
+CORS(app, resources={r"/*": {"origins":"https://doqia-client.onrender.com"}})
 
 # Configuración de la base de datos
 app.config['SQLALCHEMY_DATABASE_URI'] = 'postgresql://database_doqia_user:9iCarEpLArP1VsUXdAep3iDFK9MUx9J3@dpg-cp78vomd3nmc73bnp5u0-a.oregon-postgres.render.com/database_doqia'
