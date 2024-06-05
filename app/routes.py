@@ -76,6 +76,7 @@ def search_services(address, occupation):
     occupation = unquote(occupation)
     print(f"Search parameters: address={address}, occupation={occupation}")  # Agrega esto para depurar
     services = Service.query.filter(Service.address.ilike(f'%{address}%'), Service.occupation.ilike(f'%{occupation}%')).all()
+    print(f"Services found: {services}")  # Agrega esto para depurar
     result = [
         {
             'id': service.id,
