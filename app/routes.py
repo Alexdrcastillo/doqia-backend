@@ -171,13 +171,13 @@ def update_image(user_id, id):
 
 @app.route('/users', methods=['POST'])
 def create_user():
-    data = request.form
+    data = request.json  # Obtener los datos enviados como JSON desde el frontend
 
-    # Manejar la subida de la imagen
+    # Manejar la subida de la imagen si está presente
     if 'image_url' in request.files:
         file = request.files['image_url']
         if file and allowed_file(file.filename):
-            # Generar un nombre de archivo único usando UUID
+            # Generar un nombre de archivo único usando UUID y guardar el archivo
             filename = secure_filename(f"{uuid.uuid4().hex}_{file.filename}")
             file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
             image_url = f"/uploads/{filename}"
@@ -186,12 +186,13 @@ def create_user():
     else:
         image_url = None
 
+    # Construir los datos del nuevo usuario
     new_user_data = {
         'username': data['username'],
         'email': data['email'],
         'password': data['password'],
-        'is_client': data.get('is_client', True),
-        'numero_salud': data.get('numero_salud'),
+        'is_client': data.get('is_client', True),  # Por defecto True si no se especifica
+        'numero_salud': data.get('numero_salud'),  # Puede ser None si no se envía
         'image_url': image_url
     }
 
@@ -199,11 +200,12 @@ def create_user():
     if 'ciudad' in data:
         new_user_data['ciudad'] = data['ciudad']
 
+    # Crear el nuevo usuario en la base de datos
     new_user = User(**new_user_data)
-
     db.session.add(new_user)
     db.session.commit()
 
+    # Respuesta JSON con los detalles del usuario creado
     return jsonify({
         'message': 'User created successfully',
         'user': {
@@ -213,10 +215,10 @@ def create_user():
             'is_client': new_user.is_client,
             'numero_salud': new_user.numero_salud,
             'image_url': new_user.image_url,
-            'ciudad': new_user.ciudad  # Añadir ciudad al JSON de respuesta
+            'ciudad': new_user.ciudad  # Añadir ciudad al JSON de respuesta si está presente
         }
-    })  
-
+    })
+    
 @app.route('/users/<int:user_id>', methods=['GET'])
 def get_user(user_id):
     user = User.query.get(user_id)

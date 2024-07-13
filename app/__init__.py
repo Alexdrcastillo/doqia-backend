@@ -12,7 +12,7 @@ import stripe
 app = Flask(__name__)
 
 # Configuración de CORS
-CORS(app, resources={r"/*": {"origins": "http://localhost:3000"}})
+CORS(app, origins='*')
 
 # Configuración de las claves de Stripe
 app.config['STRIPE_PUBLIC_KEY'] = 'pk_test_51PZ2OyGpQaucOZIPCeji7BENlnaUH9emeodQQs0SJjFRLi83TKx6mTAoYLfxY0Lwtp7kXlVJMKsB2zmKrRvVMmkL00n9ncqLh2'
