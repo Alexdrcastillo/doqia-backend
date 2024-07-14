@@ -171,7 +171,7 @@ def update_image(user_id, id):
 
 @app.route('/users', methods=['POST'])
 def create_user():
-    data = request.json  # Obtener los datos enviados como JSON desde el frontend
+    data = request.form.to_dict()  # Obtener los datos enviados como formulario
 
     # Manejar la subida de la imagen si está presente
     if 'image_url' in request.files:
@@ -188,17 +188,14 @@ def create_user():
 
     # Construir los datos del nuevo usuario
     new_user_data = {
-        'username': data['username'],
-        'email': data['email'],
-        'password': data['password'],
-        'is_client': data.get('is_client', True),  # Por defecto True si no se especifica
+        'username': data.get('username'),
+        'email': data.get('email'),
+        'password': data.get('password'),
+        'is_client': data.get('is_client', 'true').lower() == 'true',  # Convertir a boolean
         'numero_salud': data.get('numero_salud'),  # Puede ser None si no se envía
-        'image_url': image_url
+        'image_url': image_url,
+        'ciudad': data.get('ciudad')
     }
-
-    # Agregar ciudad si está presente en los datos
-    if 'ciudad' in data:
-        new_user_data['ciudad'] = data['ciudad']
 
     # Crear el nuevo usuario en la base de datos
     new_user = User(**new_user_data)
