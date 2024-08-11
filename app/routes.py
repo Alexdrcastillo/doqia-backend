@@ -4,17 +4,22 @@ from app.models import User, Service, Comment, db, Reservation, SavedService,Use
 from urllib.parse import unquote
 from collections import OrderedDict
 import os
+import json
 from werkzeug.utils import secure_filename
 from io import BytesIO
 from flask import send_file
 from datetime import datetime
 import stripe
+from flask_cors import CORS
+import uuid
+from werkzeug.security import generate_password_hash
 
 
 
 def allowed_file(filename)  :
     return '.' in filename and \
            filename.rsplit('.', 1)[1].lower() in app.config['ALLOWED_EXTENSIONS']
+
 
 @app.route('/create-payment-intent', methods=['POST'])
 def create_payment_intent():
@@ -97,9 +102,11 @@ def download_file(filename):
 
 @app.route('/uploads/<path:filename>')
 def get_uploaded_file(filename):
-    return send_from_directory(app.config['UPLOAD_FOLDER'], filename)
-import uuid  # Importar el módulo uuid para generar un identificador único
-
+    try:
+        return send_from_directory(app.config['UPLOAD_FOLDER'], filename)
+    except FileNotFoundError:
+        return jsonify({'message': 'Image not found'}), 404
+        
 from flask import send_file
 
 @app.route('/users/<int:user_id>/upload_image', methods=['POST'])
@@ -168,53 +175,58 @@ def update_image(user_id, id):
     return jsonify({'message': 'Image updated successfully'}), 200
 
 
-
 @app.route('/users', methods=['POST'])
 def create_user():
-    data = request.form.to_dict()  # Obtener los datos enviados como formulario
-
-    # Manejar la subida de la imagen si está presente
     if 'image_url' in request.files:
-        file = request.files['image_url']
-        if file and allowed_file(file.filename):
-            # Generar un nombre de archivo único usando UUID y guardar el archivo
-            filename = secure_filename(f"{uuid.uuid4().hex}_{file.filename}")
-            file.save(os.path.join(app.config['UPLOAD_FOLDER'], filename))
-            image_url = f"/uploads/{filename}"
-        else:
-            image_url = None
+        image = request.files['image_url']
+        save_directory = 'uploads/'  # Cambia esto al directorio adecuado
+
+        if not os.path.exists(save_directory):
+            os.makedirs(save_directory)
+
+        # Genera un nombre único para el archivo
+        filename = secure_filename(image.filename)
+        unique_filename = str(uuid.uuid4()) + "_" + filename
+        image_url = os.path.join(save_directory, unique_filename)
+        
+        # Guarda la imagen
+        image.save(image_url)
+        
+        # Genera la URL pública de la imagen
+        image_url_public = "/uploads/" + unique_filename
     else:
-        image_url = None
+        image_url_public = None
 
-    # Construir los datos del nuevo usuario
-    new_user_data = {
-        'username': data.get('username'),
-        'email': data.get('email'),
-        'password': data.get('password'),
-        'is_client': data.get('is_client', 'true').lower() == 'true',  # Convertir a boolean
-        'numero_salud': data.get('numero_salud'),  # Puede ser None si no se envía
-        'image_url': image_url,
-        'ciudad': data.get('ciudad')
-    }
+    username = request.form.get('username')
+    email = request.form.get('email')
+    password = request.form.get('password')
+    numero_salud = request.form.get('numero_salud')
+    ciudad = request.form.get('ciudad')
+    available_times = request.form.get('available_times')
 
-    # Crear el nuevo usuario en la base de datos
-    new_user = User(**new_user_data)
+    # Si se proporciona available_times, asegúrate de convertirlo a un objeto JSON
+    if available_times:
+        try:
+            available_times = json.loads(available_times)
+        except ValueError:
+            return jsonify({'error': 'Formato JSON inválido en available_times'}), 400
+    else:
+        available_times = None
+
+    new_user = User(
+        username=username,
+        email=email,
+        password=password,  # No cifrar la contraseña
+        numero_salud=numero_salud,
+        ciudad=ciudad,
+        image_url=image_url_public,
+        available_times=available_times
+    )
     db.session.add(new_user)
     db.session.commit()
 
-    # Respuesta JSON con los detalles del usuario creado
-    return jsonify({
-        'message': 'User created successfully',
-        'user': {
-            'id': new_user.id,
-            'username': new_user.username,
-            'email': new_user.email,
-            'is_client': new_user.is_client,
-            'numero_salud': new_user.numero_salud,
-            'image_url': new_user.image_url,
-            'ciudad': new_user.ciudad  # Añadir ciudad al JSON de respuesta si está presente
-        }
-    })
+    return jsonify({'message': 'User created successfully'}), 201
+
     
 @app.route('/users/<int:user_id>', methods=['GET'])
 def get_user(user_id):
@@ -280,7 +292,6 @@ def add_familiar(user_id):
         db.session.rollback()
         return jsonify({'message': 'Error al agregar familiar', 'error': str(e)}), 500   
 
-from flask import jsonify
 
 @app.route('/users/<int:user_id>/client_reservations', methods=['GET'])
 def get_client_reservations(user_id):
@@ -337,29 +348,65 @@ def get_users():
             'numero_salud': user.numero_salud,
             'image_url': user.image_url,
             'ciudad': user.ciudad,
-            'password': user.password
+            'password': user.password,
+            'available_times': user.available_times
 
         }
         for user in users
     ]
     return jsonify(result), 200
-
-
-
 @app.route('/services', methods=['POST'])
 def create_service():
     data = request.get_json()
-    user_id = data['user_id']
-    description = data['description']
-    address = data['address']
-    occupation = data['occupation']
+    print(data)  # Imprime el JSON recibido para depuración
+
+    user_id = data.get('user_id')
+    description = data.get('description')
+    address = data.get('address')
+    occupations = data.get('occupations', [])  # Asegúrate de que 'occupations' sea una lista
+    type = data.get('type')
+    prices = data.get('prices', {})  # Obtener el campo prices, si existe
+
+    # Validar datos
+    if not user_id or not description or not address or type is None:
+        return jsonify({'message': 'Missing data'}), 400
+
+    if not isinstance(occupations, list):
+        return jsonify({'message': 'Occupations must be a list'}), 400
+
+    if not isinstance(prices, dict):
+        return jsonify({'message': 'Prices must be a JSON object'}), 400
+
     user = User.query.get(user_id)
     if not user:
         return jsonify({'message': 'User not found'}), 404
-    new_service = Service(user_id=user_id, description=description, address=address, occupation=occupation)
+
+    new_service = Service(
+        user_id=user_id,
+        description=description,
+        address=address,
+        occupations=occupations,  # Usa la lista proporcionada
+        type=type,
+        prices=prices  # Usa el diccionario de precios proporcionado
+    )
+
     db.session.add(new_service)
     db.session.commit()
-    return jsonify({'message': 'Service created successfully'}), 201
+
+    return jsonify({
+        'id': new_service.id,
+        'description': new_service.description,
+        'address': new_service.address,
+        'occupations': new_service.occupations,
+        'type': new_service.type,
+        'prices': new_service.prices,  # Incluye precios en la respuesta
+        'comments': [{'id': comment.id, 'text': comment.text} for comment in new_service.comments],
+        'username': new_service.user.username,
+        'user_id': new_service.user.id,
+        'image_url': new_service.user.image_url,
+        'numero_salud': new_service.user.numero_salud
+    }), 201
+
 
 @app.route('/saved_services', methods=['POST'])
 def save_service():
@@ -408,24 +455,31 @@ def get_saved_services(user_id):
     ]
     return jsonify(result), 200
 
+
+
 @app.route('/services', methods=['GET'])
 def get_services():
     services = Service.query.all()
-    result = [
-        {
+    services_list = []
+
+    for service in services:
+        services_list.append({
             'id': service.id,
             'description': service.description,
             'address': service.address,
-            'occupation': service.occupation,
+            'occupations': service.occupations,
+            'type': service.type,
+            'prices': service.prices,  # Incluye el campo prices
             'comments': [{'id': comment.id, 'text': comment.text} for comment in service.comments],
-            'username': service.user.username,  # Added username
+            'username': service.user.username,
             'user_id': service.user.id,
             'image_url': service.user.image_url,
             'numero_salud': service.user.numero_salud
-        }
-        for service in services
-    ]
-    return jsonify(result), 200
+        })
+
+    return jsonify(services_list)
+
+
 
 from urllib.parse import unquote
 from flask import jsonify
@@ -442,8 +496,8 @@ def get_user_services(user_id):
             'id': service.id,
             'description': service.description,
             'address': service.address,
-            'occupation': service.occupation,
-            'type': service.type,  # Incluir el tipo en la respuesta JSON
+            'occupations': service.occupations,  # Accede a 'occupations' en lugar de 'occupation'
+            'type': service.type,
             'comments': [{'id': comment.id, 'text': comment.text} for comment in service.comments],
             'username': service.user.username,
             'user_id': service.user.id,
@@ -453,46 +507,75 @@ def get_user_services(user_id):
         for service in services
     ]
     return jsonify(result), 200
+
 
 
 @app.route('/services/<address>/<occupation>', methods=['GET'])
 def search_services(address, occupation):
     address = unquote(address)
-    occupation = unquote(occupation)
-    services = Service.query.filter(
-        Service.address.ilike(f'%{address}%'),
-        Service.occupation.ilike(f'%{occupation}%')
-    ).all()
+    occupation = unquote(occupation)  # Corrige el nombre de la variable
+
+    # Filtrar los servicios por dirección
+    services = Service.query.filter(Service.address.ilike(f'%{address}%')).all()
+
+    # Filtrar los servicios por la ocupación dentro de los precios
+    filtered_services = []
+    for service in services:
+        if service.prices and any(occ.lower() == occupation.lower() for occ in service.prices.keys()):
+            filtered_services.append(service)
+
     result = [
         {
             'id': service.id,
             'description': service.description,
             'address': service.address,
-            'occupation': service.occupation,
+            'occupations': service.occupations,
             'comments': [{'id': comment.id, 'text': comment.text} for comment in service.comments],
             'username': service.user.username,
             'user_id': service.user.id,
             'image_url': service.user.image_url,
-            'numero_salud': service.user.numero_salud
+            'numero_salud': service.user.numero_salud,
+            'prices': service.prices
         }
-        for service in services
+        for service in filtered_services
     ]
+    
     return jsonify(result), 200
-
 @app.route('/services/<int:service_id>', methods=['GET'])
 def get_service_by_id(service_id):
     service = Service.query.get_or_404(service_id)
+
+    # Obtener los días hábiles y el rango de fechas del usuario que publicó el servicio
+    user = service.user
+    available_times = user.available_times
+
+    # Estructura para los días hábiles y el rango de fechas
+    days = []
+    if available_times:
+        for time_range in available_times:
+            day = time_range.get('day', '')
+            start_time = time_range.get('startTime', '')
+            end_time = time_range.get('endTime', '')
+            days.append({
+                'day': day,
+                'start_time': start_time,
+                'end_time': end_time
+            })
+
     result = {
         'id': service.id,
         'description': service.description,
         'address': service.address,
-        'occupation': service.occupation,
+        'occupations': service.occupations,
+        'prices': service.prices,  # Incluimos los precios en la respuesta
         'comments': [{'id': comment.id, 'text': comment.text} for comment in service.comments],
-        'username': service.user.username,
-        'user_id': service.user.id,
-        'image_url': service.user.image_url,
-        'numero_salud': service.user.numero_salud
+        'username': user.username,
+        'user_id': user.id,
+        'image_url': user.image_url,
+        'numero_salud': user.numero_salud,
+        'available_times': days  # Incluimos los días hábiles y el rango de fechas
     }
+    
     return jsonify(result), 200
 
 @app.route('/services/<int:service_id>/comment', methods=['POST'])
@@ -551,7 +634,6 @@ def delete_image(user_id, id):
 
 
 
-
 @app.route('/reservations', methods=['POST'])
 def create_reservation():
     data = request.get_json()
@@ -561,7 +643,7 @@ def create_reservation():
     type = data.get('type')
     patient_name = data.get('patient_name')
     address = data.get('address')
-    time_slot = data.get('time_slot')
+    time_slot = data.get('time_slot')  # Ejemplo: "Lunes 6:00 AM"
     comment = data.get('comment')
 
     client = User.query.get(client_id)
@@ -573,11 +655,11 @@ def create_reservation():
     new_reservation = Reservation(
         client_id=client_id,
         service_id=service_id,
-        reservation_date=datetime.utcnow(),
+        reservation_date=datetime.utcnow(),  # Guarda la fecha actual
         type=type,
         patient_name=patient_name,
         address=address,
-        time_slot=time_slot,
+        time_slot=time_slot,  # Guarda la hora seleccionada
         comment=comment
     )
 
@@ -588,7 +670,6 @@ def create_reservation():
         'message': 'Reservation created successfully',
         'reservation': new_reservation.to_dict()
     }), 201
-
 
 @app.route('/users/<int:user_id>/reservations', methods=['GET'])
 def get_reservations(user_id):

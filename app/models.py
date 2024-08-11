@@ -1,10 +1,7 @@
-from sqlalchemy import Column, Integer, String, Boolean, ForeignKey, DateTime, Float, Date
+from sqlalchemy import Column, Integer, String, Boolean, ForeignKey, DateTime, Float, Date, Enum,JSON
 from sqlalchemy.orm import relationship
 from datetime import datetime
 from . import db
-import sqlalchemy_utils
-from sqlalchemy import Enum
-
 
 class User(db.Model):
     __tablename__ = 'user'
@@ -25,7 +22,8 @@ class User(db.Model):
     historial_familiar = Column(String(255), nullable=True)
     numero_salud = Column(String(50), nullable=True)
     image_url = Column(String(255), nullable=True)
-    ciudad = Column(String(50), nullable=True)  # Nuevo campo para la ciudad del usuario
+    ciudad = Column(String(50), nullable=True)
+    available_times = Column(JSON, nullable=True)  # Nuevo campo para horarios disponibles
     reservations = relationship('Reservation', backref='client', lazy=True)
     services = relationship('Service', backref='user', lazy=True)
     accepted_reservations = relationship('Reservation', primaryjoin="and_(User.id==Reservation.client_id, Reservation.accept==True)", lazy=True)
@@ -36,17 +34,19 @@ class UserImage(db.Model):
     user_id = Column(Integer, ForeignKey('user.id'), nullable=False)
     image_url = Column(String(255), nullable=False)
     description = Column(String(255), nullable=True)
-    upload_date = Column(String(50), nullable=True)     
-
+    upload_date = Column(String(50), nullable=True)
+    
 class Service(db.Model):
     __tablename__ = 'service'
-    id = Column(Integer, primary_key=True)
-    user_id = Column(Integer, ForeignKey('user.id'), nullable=False)
-    description = Column(String(255), nullable=False)
-    address = Column(String(255), nullable=False)
-    occupation = Column(String(50), nullable=False)
-    type = Column(Enum('telemedicina', 'domicilio'), nullable=False)  # Agregar el campo type
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    description = db.Column(db.String(255), nullable=False)
+    address = db.Column(db.String(255), nullable=False)
+    occupations = db.Column(db.JSON, nullable=False, default=[])  # Cambiado a lista vacía
+    type = db.Column(db.Enum('telemedicina', 'domicilio', 'ambos'), nullable=False)
+    prices = db.Column(db.JSON, nullable=True, default={})  # Agregar este campo
     reservations = db.relationship('Reservation', backref='service', lazy=True)
+
 
 class Comment(db.Model):
     __tablename__ = 'comment'
@@ -80,8 +80,6 @@ class Reservation(db.Model):
             'comment': self.comment,
             'accept': self.accept
         }
-
-
 
 class SavedService(db.Model):
     __tablename__ = 'saved_service'
